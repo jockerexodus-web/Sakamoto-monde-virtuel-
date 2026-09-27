@@ -1,700 +1,629 @@
 // ============================================
-// MUSHOKU TENSEI VR - GAME LOGIC
+// MUSHOKU TENSEI - MONDE OUVERT MOBILE VR
 // ============================================
 
-const GameState = {
+const Game = {
     running: false,
-    health: 100,
-    maxHealth: 100,
-    mana: 100,
-    maxMana: 100,
-    level: 1,
-    xp: 0,
-    xpMax: 100,
-    wave: 1,
-    enemies: [],
-    projectiles: [],
-    currentSpell: 0,
-    lastShot: 0,
-    shootCooldown: 350,
-    spawnInterval: null,
-    manaRegenInterval: null,
-    enemiesRemaining: 0,
-    kills: 0
+    paused: false,
+    selectedChar: null,
+    player: null,
+    camera: null,
+    moveJoystick: { active: false, dx: 0, dz: 0, touchId: null },
+    lookTouch: { active: false, x: 0, y: 0, touchId: null },
+    cameraYaw: 0,
+    cameraPitch: 0,
+    playerYaw: 0,
+    creatures: [],
+    lastFrame: performance.now(),
+    currentLocation: 'Buina Village'
 };
 
 // ============================================
-// SORTS MAGIQUES
+// PERSONNAGES JOUABLES
 // ============================================
-const SPELLS = [
-    {
-        name: 'Boule de Feu',
-        icon: '🔥',
-        color: '#ff4400',
-        emissive: '#ff6600',
-        manaCost: 5,
-        damage: 3,
-        speed: 0.6,
-        radius: 0.25,
-        projectileColor: '#ff2200'
+const CHARACTERS = {
+    rudeus: {
+        name: 'Rudeus Greyrat',
+        avatar: '🧙‍♂️',
+        color: '#4682b4',
+        accent: '#87ceeb',
+        speed: 0.08,
+        abilities: ['Boule de feu', 'Vent', 'Eau'],
+        startPos: { x: 0, z: 5 }
     },
-    {
-        name: 'Glace',
-        icon: '💧',
-        color: '#44aaff',
-        emissive: '#88ddff',
-        manaCost: 8,
-        damage: 5,
-        speed: 0.4,
-        radius: 0.2,
-        projectileColor: '#88ddff'
+    roxy: {
+        name: 'Roxy Migurdia',
+        avatar: '👩‍🎓',
+        color: '#ffffff',
+        accent: '#87ceeb',
+        speed: 0.09,
+        abilities: ['Eau', 'Glace', 'Lumière'],
+        startPos: { x: -5, z: 10 }
     },
-    {
-        name: 'Foudre',
-        icon: '⚡',
-        color: '#ffdd00',
-        emissive: '#ffff00',
-        manaCost: 12,
-        damage: 8,
-        speed: 1.2,
-        radius: 0.15,
-        projectileColor: '#ffff00'
+    eris: {
+        name: 'Eris Boreas Greyrat',
+        avatar: '⚔️',
+        color: '#dc143c',
+        accent: '#ff6b6b',
+        speed: 0.11,
+        abilities: ['Épée', 'Feu', 'Rage'],
+        startPos: { x: 5, z: 8 }
+    },
+    sylphie: {
+        name: 'Sylphiette',
+        avatar: '🌿',
+        color: '#90ee90',
+        accent: '#228b22',
+        speed: 0.1,
+        abilities: ['Vent', 'Soin', 'Camouflage'],
+        startPos: { x: -8, z: -3 }
+    },
+    ruijerd: {
+        name: 'Ruijerd Superdia',
+        avatar: '🛡️',
+        color: '#a9a9a9',
+        accent: '#696969',
+        speed: 0.07,
+        abilities: ['Lance', 'Force', 'Bouclier'],
+        startPos: { x: 8, z: -5 }
+    },
+    paul: {
+        name: 'Paul Greyrat',
+        avatar: '🗡️',
+        color: '#daa520',
+        accent: '#8b4513',
+        speed: 0.09,
+        abilities: ['Épée', 'Tactique', 'Endurance'],
+        startPos: { x: 0, z: -8 }
     }
+};
+
+// ============================================
+// LIEUX DU MONDE (pour la boussole et découvertes)
+// ============================================
+const LOCATIONS = [
+    { name: 'Buina Village', x: 0, z: 0, radius: 25 },
+    { name: 'Forêt de Buina', x: 0, z: -80, radius: 40 },
+    { name: 'Lac Sacré', x: 80, z: 0, radius: 30 },
+    { name: 'Ruines Antiques', x: -80, z: 0, radius: 30 },
+    { name: 'Montagne', x: 0, z: 80, radius: 35 }
 ];
+
+// ============================================
+// SÉLECTION DU PERSONNAGE
+// ============================================
+document.querySelectorAll('.char-card').forEach(card => {
+    card.addEventListener('click', () => {
+        document.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        Game.selectedChar = card.dataset.char;
+        document.getElementById('start-btn').disabled = false;
+    });
+});
+
+document.getElementById('start-btn').addEventListener('click', startGame);
 
 // ============================================
 // DÉMARRAGE DU JEU
 // ============================================
 function startGame() {
-    document.getElementById('start-screen').style.display = 'none';
+    if (!Game.selectedChar) return;
+    
+    const char = CHARACTERS[Game.selectedChar];
+    
+    // Masquer l'écran de sélection
+    document.getElementById('char-select').style.display = 'none';
     document.getElementById('hud').style.display = 'block';
-    document.getElementById('crosshair').style.display = 'block';
+    document.getElementById('joystick-container').style.display = 'block';
     
-    GameState.running = true;
-    GameState.health = 100;
-    GameState.mana = 100;
-    GameState.level = 1;
-    GameState.xp = 0;
-    GameState.wave = 1;
+    // Mettre à jour le HUD
+    document.getElementById('hud-avatar').textContent = char.avatar;
+    document.getElementById('hud-name').textContent = char.name;
     
-    updateHUD();
-    updateSpellVisual();
+    // Positionner le joueur
+    const player = document.getElementById('player');
+    player.setAttribute('position', `${char.startPos.x} 1.6 ${char.startPos.z}`);
     
-    // Démarrage des systèmes
-    startWave();
-    GameState.manaRegenInterval = setInterval(regenerateMana, 1000);
+    Game.running = true;
+    Game.player = player;
+    Game.camera = document.querySelector('[camera]');
     
-    showMessage('✨ Bienvenue, Rudeus !', '#ffd700');
-    setTimeout(() => showMessage('🌊 Vague 1 commence...', '#ff6b6b'), 1500);
+    // Générer les créatures paisibles
+    spawnPeacefulCreatures();
+    
+    // Générer des PNJ
+    spawnNPCs();
+    
+    // Initialiser les contrôles
+    initMobileControls();
+    
+    // Init VR si disponible
+    initVR();
+    
+    // Boucle de jeu
+    requestAnimationFrame(gameLoop);
+    
+    notify(`✨ Bienvenue, ${char.name} !`, 2500);
+    setTimeout(() => notify('🌍 Explore le monde librement', 2000), 2700);
+    setTimeout(() => notify('🎮 Joystick pour marcher', 2000), 5000);
 }
 
 // ============================================
-// GESTION DES VAGUES
+// CONTRÔLES MOBILES (JOYSTICK + LOOK)
 // ============================================
-function startWave() {
-    const count = 3 + GameState.wave * 2;
-    GameState.enemiesRemaining = count;
-    document.getElementById('wave').textContent = GameState.wave;
-    updateHUD();
+function initMobileControls() {
+    const joystickBase = document.getElementById('joystick-base');
+    const joystickStick = document.getElementById('joystick-stick');
     
-    let spawned = 0;
-    const spawnTimer = setInterval(() => {
-        if (spawned >= count || !GameState.running) {
-            clearInterval(spawnTimer);
-            return;
-        }
-        spawnEnemy();
-        spawned++;
-    }, 900);
-}
-
-function checkWaveEnd() {
-    if (GameState.enemies.length === 0 && GameState.enemiesRemaining <= 0) {
-        GameState.wave++;
-        showMessage(`🌊 Vague ${GameState.wave} approche !`, '#ff6b6b');
-        setTimeout(startWave, 3000);
-    }
-}
-
-// ============================================
-// SPAWN DES MONSTRES
-// ============================================
-function spawnEnemy() {
-    if (!GameState.running) return;
+    const baseRect = () => joystickBase.getBoundingClientRect();
+    const maxDist = 35;
     
-    const scene = document.querySelector('a-scene');
-    const angle = Math.random() * Math.PI * 2;
-    const distance = 18 + Math.random() * 10;
-    const x = Math.cos(angle) * distance;
-    const z = Math.sin(angle) * distance;
+    // ---- JOYSTICK MOUVEMENT ----
+    joystickBase.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (Game.moveJoystick.touchId !== null) return;
+        const touch = e.changedTouches[0];
+        Game.moveJoystick.touchId = touch.identifier;
+        Game.moveJoystick.active = true;
+        handleJoystickMove(touch);
+    }, { passive: false });
     
-    const enemy = document.createElement('a-entity');
-    enemy.setAttribute('position', `${x} 0 ${z}`);
-    enemy.setAttribute('enemy-ai', '');
-    
-    // Choix du type de monstre
-    const types = ['slime', 'goblin', 'wolf'];
-    const type = types[Math.floor(Math.random() * Math.min(types.length, 1 + GameState.wave))];
-    enemy.enemyType = type;
-    
-    let hp, speed, color, size, dmg;
-    
-    switch(type) {
-        case 'slime':
-            hp = 3; speed = 0.012; color = '#44cc44'; size = 1; dmg = 5;
-            break;
-        case 'goblin':
-            hp = 5; speed = 0.02; color = '#aa6622'; size = 1.2; dmg = 10;
-            break;
-        case 'wolf':
-            hp = 4; speed = 0.035; color = '#666666'; size = 0.9; dmg = 8;
-            break;
-    }
-    
-    // Ajustement selon la vague
-    hp = Math.floor(hp * (1 + GameState.wave * 0.15));
-    enemy.health = hp;
-    enemy.maxHealth = hp;
-    enemy.speed = speed;
-    enemy.damage = dmg;
-    enemy.attackCooldown = 0;
-    
-    buildEnemyMesh(enemy, type, color, size);
-    
-    scene.appendChild(enemy);
-    GameState.enemies.push(enemy);
-}
-
-function buildEnemyMesh(enemy, type, color, size) {
-    // Corps principal
-    const body = document.createElement('a-sphere');
-    body.setAttribute('radius', (0.5 * size).toString());
-    body.setAttribute('color', color);
-    body.setAttribute('position', `0 ${0.5 * size} 0`);
-    body.setAttribute('material', `emissive: ${color}; emissiveIntensity: 0.3`);
-    enemy.appendChild(body);
-    
-    // Yeux rouges
-    const eye1 = document.createElement('a-sphere');
-    eye1.setAttribute('radius', '0.1');
-    eye1.setAttribute('color', '#ff0000');
-    eye1.setAttribute('position', `${-0.15 * size} ${0.6 * size} ${-0.4 * size}`);
-    eye1.setAttribute('material', 'emissive: #ff0000; emissiveIntensity: 2');
-    enemy.appendChild(eye1);
-    
-    const eye2 = document.createElement('a-sphere');
-    eye2.setAttribute('radius', '0.1');
-    eye2.setAttribute('color', '#ff0000');
-    eye2.setAttribute('position', `${0.15 * size} ${0.6 * size} ${-0.4 * size}`);
-    eye2.setAttribute('material', 'emissive: #ff0000; emissiveIntensity: 2');
-    enemy.appendChild(eye2);
-    
-    // Barre de vie au-dessus
-    const healthBarBg = document.createElement('a-plane');
-    healthBarBg.setAttribute('width', (1.2 * size).toString());
-    healthBarBg.setAttribute('height', '0.1');
-    healthBarBg.setAttribute('color', '#333');
-    healthBarBg.setAttribute('position', `0 ${1.3 * size} 0`);
-    healthBarBg.setAttribute('rotation', '0 0 0');
-    healthBarBg.classList.add('health-bar-bg');
-    enemy.appendChild(healthBarBg);
-    
-    const healthBar = document.createElement('a-plane');
-    healthBar.setAttribute('width', (1.2 * size).toString());
-    healthBar.setAttribute('height', '0.1');
-    healthBar.setAttribute('color', '#ff0000');
-    healthBar.setAttribute('position', `0 ${1.3 * size} 0.01`);
-    healthBar.classList.add('health-bar');
-    enemy.appendChild(healthBar);
-}
-
-// ============================================
-// TIR DES SORTS
-// ============================================
-document.addEventListener('click', handleShoot);
-document.addEventListener('touchstart', (e) => {
-    if (GameState.running && e.target.tagName !== 'BUTTON') handleShoot();
-});
-
-// Changer de sort avec les touches 1-3
-document.addEventListener('keydown', (e) => {
-    if (e.key >= '1' && e.key <= '3') {
-        GameState.currentSpell = parseInt(e.key) - 1;
-        updateSpellVisual();
-    }
-});
-
-function updateSpellVisual() {
-    // Mise à jour HUD
-    document.querySelectorAll('.spell-slot').forEach((slot, i) => {
-        slot.classList.toggle('active', i === GameState.currentSpell);
-    });
-    
-    // Mise à jour orbe
-    const spell = SPELLS[GameState.currentSpell];
-    const orb = document.getElementById('spell-orb');
-    if (orb) {
-        orb.setAttribute('material', 
-            `color: ${spell.color}; emissive: ${spell.emissive}; emissiveIntensity: 1.5; opacity: 0.8`);
-    }
-}
-
-function handleShoot() {
-    if (!GameState.running) return;
-    
-    const now = Date.now();
-    if (now - GameState.lastShot < GameState.shootCooldown) return;
-    
-    const spell = SPELLS[GameState.currentSpell];
-    
-    // Vérifier le mana
-    if (GameState.mana < spell.manaCost) {
-        showMessage('💧 Pas assez de mana !', '#ff6b6b');
-        return;
-    }
-    
-    GameState.mana -= spell.manaCost;
-    GameState.lastShot = now;
-    updateHUD();
-    
-    // Animation de l'orbe
-    const orb = document.getElementById('spell-orb');
-    if (orb) {
-        orb.setAttribute('material', 
-            `color: #ffffff; emissive: #ffffff; emissiveIntensity: 3; opacity: 1`);
-        setTimeout(() => {
-            orb.setAttribute('material', 
-                `color: ${spell.color}; emissive: ${spell.emissive}; emissiveIntensity: 1.5; opacity: 0.8`);
-        }, 80);
-    }
-    
-    // Récupérer la direction du regard
-    const camera = document.querySelector('[camera]');
-    const direction = new THREE.Vector3();
-    camera.object3D.getWorldDirection(direction);
-    
-    const origin = new THREE.Vector3();
-    camera.object3D.getWorldPosition(origin);
-    
-    // Créer un projectile visuel
-    createProjectile(origin, direction, spell);
-}
-
-function createProjectile(origin, direction, spell) {
-    const scene = document.querySelector('a-scene');
-    const proj = document.createElement('a-sphere');
-    proj.setAttribute('radius', spell.radius.toString());
-    proj.setAttribute('color', spell.projectileColor);
-    proj.setAttribute('material', 
-        `emissive: ${spell.projectileColor}; emissiveIntensity: 2; opacity: 0.9`);
-    proj.setAttribute('position', `${origin.x} ${origin.y} ${origin.z}`);
-    
-    // Lumière attachée
-    const light = document.createElement('a-entity');
-    light.setAttribute('light', `type: point; color: ${spell.projectileColor}; intensity: 1; distance: 5`);
-    proj.appendChild(light);
-    
-    scene.appendChild(proj);
-    
-    const projectileData = {
-        element: proj,
-        direction: direction.clone(),
-        speed: spell.speed,
-        damage: spell.damage,
-        life: 0,
-        maxLife: 120,
-        spell: spell
-    };
-    
-    GameState.projectiles.push(projectileData);
-}
-
-// ============================================
-// UPDATE DES PROJECTILES
-// ============================================
-function updateProjectiles() {
-    const projectilesToRemove = [];
-    
-    GameState.projectiles.forEach((proj, index) => {
-        proj.life++;
-        
-        // Avancer
-        const pos = proj.element.object3D.position;
-        pos.x += proj.direction.x * proj.speed;
-        pos.y += proj.direction.y * proj.speed;
-        pos.z += proj.direction.z * proj.speed;
-        
-        // Rotation
-        proj.element.object3D.rotation.x += 0.15;
-        proj.element.object3D.rotation.y += 0.15;
-        
-        // Vérifier collisions avec ennemis
-        let hit = false;
-        for (const enemy of GameState.enemies) {
-            const enemyPos = enemy.object3D.position;
-            const dist = Math.sqrt(
-                Math.pow(pos.x - enemyPos.x, 2) +
-                Math.pow(pos.y - enemyPos.y - 0.5, 2) +
-                Math.pow(pos.z - enemyPos.z, 2)
-            );
-            
-            if (dist < 1) {
-                damageEnemy(enemy, proj.damage);
-                hit = true;
-                break;
+    document.addEventListener('touchmove', (e) => {
+        if (!Game.moveJoystick.active) return;
+        for (const touch of e.changedTouches) {
+            if (touch.identifier === Game.moveJoystick.touchId) {
+                handleJoystickMove(touch);
             }
         }
-        
-        // Retirer si trop vieux, hors limites ou touche
-        if (hit || proj.life > proj.maxLife || pos.y < 0 || 
-            Math.abs(pos.x) > 50 || Math.abs(pos.z) > 50) {
-            projectilesToRemove.push(index);
-            if (!hit) createImpactEffect(pos, proj.spell.projectileColor);
+    }, { passive: false });
+    
+    document.addEventListener('touchend', (e) => {
+        for (const touch of e.changedTouches) {
+            if (touch.identifier === Game.moveJoystick.touchId) {
+                Game.moveJoystick.active = false;
+                Game.moveJoystick.dx = 0;
+                Game.moveJoystick.dz = 0;
+                Game.moveJoystick.touchId = null;
+                joystickStick.style.transform = 'translate(-50%, -50%)';
+            }
         }
     });
     
-    // Nettoyer
-    projectilesToRemove.reverse().forEach(i => {
-        const p = GameState.projectiles[i];
-        p.element.parentNode && p.element.parentNode.removeChild(p.element);
-        GameState.projectiles.splice(i, 1);
+    function handleJoystickMove(touch) {
+        const rect = baseRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        
+        let dx = touch.clientX - cx;
+        let dy = touch.clientY - cy;
+        
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const clampedDist = Math.min(dist, maxDist);
+        
+        if (dist > 0) {
+            dx = (dx / dist) * clampedDist;
+            dy = (dy / dist) * clampedDist;
+        }
+        
+        joystickStick.style.transform = 
+            `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+        
+        Game.moveJoystick.dx = dx / maxDist;
+        Game.moveJoystick.dz = dy / maxDist;
+    }
+    
+    // ---- REGARDER (TOUCHER L'ÉCRAN - moitié droite) ----
+    document.addEventListener('touchstart', (e) => {
+        if (!Game.running) return;
+        // Ignorer si c'est le joystick
+        const joystickContainer = document.getElementById('joystick-container');
+        if (joystickContainer.contains(e.target)) return;
+        // Ignorer les boutons UI
+        if (e.target.closest('#menu-btn') || e.target.closest('.action-btn')) return;
+        if (Game.lookTouch.touchId !== null) return;
+        
+        const touch = e.changedTouches[0];
+        // Zone de regard = moitié droite de l'écran
+        if (touch.clientX > window.innerWidth * 0.35) {
+            Game.lookTouch.touchId = touch.identifier;
+            Game.lookTouch.x = touch.clientX;
+            Game.lookTouch.y = touch.clientY;
+            Game.lookTouch.active = true;
+        }
+    }, { passive: false });
+    
+    document.addEventListener('touchmove', (e) => {
+        if (!Game.lookTouch.active) return;
+        for (const touch of e.changedTouches) {
+            if (touch.identifier === Game.lookTouch.touchId) {
+                const dx = touch.clientX - Game.lookTouch.x;
+                const dy = touch.clientY - Game.lookTouch.y;
+                
+                Game.cameraYaw -= dx * 0.15;
+                Game.cameraPitch -= dy * 0.15;
+                
+                // Limiter le pitch
+                Game.cameraPitch = Math.max(-70, Math.min(70, Game.cameraPitch));
+                
+                // Appliquer à la caméra
+                const rig = document.getElementById('camera-rig');
+                rig.setAttribute('rotation', 
+                    `${Game.cameraPitch} ${Game.cameraYaw} 0`);
+                
+                Game.lookTouch.x = touch.clientX;
+                Game.lookTouch.y = touch.clientY;
+            }
+        }
+    }, { passive: false });
+    
+    document.addEventListener('touchend', (e) => {
+        for (const touch of e.changedTouches) {
+            if (touch.identifier === Game.lookTouch.touchId) {
+                Game.lookTouch.active = false;
+                Game.lookTouch.touchId = null;
+            }
+        }
+    });
+    
+    // ---- BOUTON ACTION ----
+    document.getElementById('action-btn').addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        doAction();
+    });
+    
+    // ---- MENU ----
+    document.getElementById('menu-btn').addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        showPauseMenu();
     });
 }
 
 // ============================================
-// DÉGÂTS AUX ENNEMIS
+// ACTION (SORT / INTERACTION)
 // ============================================
-function damageEnemy(enemy, damage) {
-    enemy.health -= damage;
+function doAction() {
+    const char = CHARACTERS[Game.selectedChar];
+    if (!char) return;
     
-    // Flash
-    const body = enemy.querySelector('a-sphere');
-    if (body) {
-        const originalColor = body.getAttribute('color');
-        body.setAttribute('color', '#ffffff');
-        setTimeout(() => {
-            if (body.parentNode) body.setAttribute('color', originalColor);
-        }, 100);
+    // Effet visuel simple
+    const hand = document.getElementById('held-item');
+    if (hand) {
+        hand.setAttribute('scale', '1.5 1.5 1.5');
+        setTimeout(() => hand.setAttribute('scale', '1 1 1'), 200);
     }
     
-    // Mise à jour barre de vie
-    const healthBar = enemy.querySelector('.health-bar');
-    if (healthBar) {
-        const ratio = Math.max(0, enemy.health / enemy.maxHealth);
-        const parent = healthBar.parentNode;
-        const bg = parent.querySelector('.health-bar-bg');
-        const baseWidth = parseFloat(bg.getAttribute('width'));
-        healthBar.setAttribute('width', (baseWidth * ratio).toString());
-        
-        // Décalage pour centrer
-        const offset = (baseWidth * (1 - ratio)) / 2;
-        const bgPos = bg.getAttribute('position');
-        healthBar.setAttribute('position', `${bgPos.x - offset} ${bgPos.y} ${parseFloat(bgPos.z) + 0.01}`);
-    }
+    // Effet sonore visuel
+    createMagicBurst();
     
-    if (enemy.health <= 0) {
-        killEnemy(enemy);
-    }
+    const ability = char.abilities[Math.floor(Math.random() * char.abilities.length)];
+    notify(`✨ ${ability} !`, 1200);
 }
 
-function killEnemy(enemy) {
-    const pos = enemy.object3D.position.clone();
-    createExplosion(pos, enemy.enemyType);
-    
-    // XP et score
-    addXP(15);
-    GameState.kills++;
-    GameState.enemiesRemaining = Math.max(0, GameState.enemiesRemaining - 1);
-    
-    // Retirer
-    enemy.parentNode && enemy.parentNode.removeChild(enemy);
-    const idx = GameState.enemies.indexOf(enemy);
-    if (idx > -1) GameState.enemies.splice(idx, 1);
-    
-    updateHUD();
-    checkWaveEnd();
-}
-
-// ============================================
-// EFFETS VISUELS
-// ============================================
-function createExplosion(position, type) {
+function createMagicBurst() {
     const scene = document.querySelector('a-scene');
-    const colors = {
-        slime: ['#44ff44', '#88ff88', '#22aa22'],
-        goblin: ['#ffaa44', '#ff8844', '#cc6622'],
-        wolf: ['#aaaaaa', '#888888', '#666666']
-    };
-    const palette = colors[type] || colors.slime;
+    const camera = Game.camera;
+    if (!camera) return;
     
-    for (let i = 0; i < 15; i++) {
-        const p = document.createElement('a-sphere');
-        p.setAttribute('radius', '0.15');
-        p.setAttribute('color', palette[i % palette.length]);
-        p.setAttribute('material', `emissive: ${palette[i % palette.length]}; emissiveIntensity: 1.5`);
-        p.setAttribute('position', `${position.x} ${position.y + 0.5} ${position.z}`);
-        scene.appendChild(p);
+    const pos = new THREE.Vector3();
+    camera.object3D.getWorldPosition(pos);
+    const dir = new THREE.Vector3();
+    camera.object3D.getWorldDirection(dir);
+    
+    for (let i = 0; i < 8; i++) {
+        const particle = document.createElement('a-sphere');
+        particle.setAttribute('radius', '0.1');
+        particle.setAttribute('color', CHARACTERS[Game.selectedChar].accent);
+        particle.setAttribute('material', 
+            `emissive: ${CHARACTERS[Game.selectedChar].accent}; emissiveIntensity: 2; opacity: 0.9`);
+        
+        const start = pos.clone().add(dir.clone().multiplyScalar(1));
+        particle.setAttribute('position', `${start.x} ${start.y} ${start.z}`);
+        scene.appendChild(particle);
         
         const vel = {
-            x: (Math.random() - 0.5) * 0.4,
-            y: Math.random() * 0.4,
-            z: (Math.random() - 0.5) * 0.4
+            x: dir.x * 0.3 + (Math.random() - 0.5) * 0.15,
+            y: dir.y * 0.3 + (Math.random() - 0.5) * 0.15 + 0.05,
+            z: dir.z * 0.3 + (Math.random() - 0.5) * 0.15
         };
         
         let life = 0;
         const interval = setInterval(() => {
             life++;
-            const pos = p.getAttribute('position');
-            vel.y -= 0.02;
-            p.setAttribute('position', 
-                `${pos.x + vel.x} ${pos.y + vel.y} ${pos.z + vel.z}`);
-            p.setAttribute('material', 
-                `emissiveIntensity: ${2 - life * 0.15}; opacity: ${1 - life * 0.08}`);
+            const p = particle.getAttribute('position');
+            particle.setAttribute('position', 
+                `${p.x + vel.x} ${p.y + vel.y} ${p.z + vel.z}`);
+            particle.setAttribute('material', 
+                `emissiveIntensity: ${2 - life * 0.2}; opacity: ${1 - life * 0.1}`);
             
-            if (life > 15) {
+            if (life > 10) {
                 clearInterval(interval);
-                p.parentNode && p.parentNode.removeChild(p);
+                particle.parentNode && particle.parentNode.removeChild(particle);
             }
         }, 30);
     }
 }
 
-function createImpactEffect(position, color) {
+// ============================================
+// CRÉATURES PAISIBLES (ambiance)
+// ============================================
+function spawnPeacefulCreatures() {
     const scene = document.querySelector('a-scene');
-    const ring = document.createElement('a-ring');
-    ring.setAttribute('position', `${position.x} ${position.y} ${position.z}`);
-    ring.setAttribute('radius-inner', '0.1');
-    ring.setAttribute('radius-outer', '0.15');
-    ring.setAttribute('color', color);
-    ring.setAttribute('material', `emissive: ${color}; emissiveIntensity: 2; opacity: 0.9`);
-    scene.appendChild(ring);
+    const creatureZone = document.getElementById('creatures');
     
-    let scale = 1;
-    let opacity = 1;
-    const interval = setInterval(() => {
-        scale += 0.15;
-        opacity -= 0.05;
-        ring.setAttribute('radius-inner', (0.1 * scale).toString());
-        ring.setAttribute('radius-outer', (0.15 * scale).toString());
-        ring.setAttribute('material', `opacity: ${opacity}`);
+    // Créatures (petits animaux qui se baladent)
+    for (let i = 0; i < 12; i++) {
+        const creature = document.createElement('a-entity');
+        const angle = Math.random() * Math.PI * 2;
+        const radius = 20 + Math.random() * 60;
+        const x = Math.cos(angle) * radius;
+        const z = Math.sin(angle) * radius;
         
-        if (opacity <= 0) {
-            clearInterval(interval);
-            ring.parentNode && ring.parentNode.removeChild(ring);
-        }
-    }, 30);
-}
-
-function showMessage(text, color = '#ffd700') {
-    const msg = document.createElement('div');
-    msg.textContent = text;
-    msg.style.cssText = `
-        position: fixed;
-        top: 30%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        color: ${color};
-        font-size: 32px;
-        font-weight: bold;
-        text-shadow: 0 0 20px ${color};
-        z-index: 150;
-        pointer-events: none;
-        animation: fadeIn 0.5s ease;
-        white-space: nowrap;
-    `;
-    document.body.appendChild(msg);
-    
-    setTimeout(() => {
-        msg.style.transition = 'opacity 0.5s';
-        msg.style.opacity = '0';
-        setTimeout(() => msg.remove(), 500);
-    }, 1800);
-}
-
-// ============================================
-// XP ET NIVEAUX
-// ============================================
-function addXP(amount) {
-    GameState.xp += amount;
-    
-    while (GameState.xp >= GameState.xpMax) {
-        GameState.xp -= GameState.xpMax;
-        GameState.level++;
-        GameState.xpMax = Math.floor(GameState.xpMax * 1.4);
+        creature.setAttribute('position', `${x} 0.3 ${z}`);
+        creature.setAttribute('creature-behavior', '');
         
-        // Bonus de niveau
-        GameState.maxHealth += 20;
-        GameState.maxMana += 20;
-        GameState.health = GameState.maxHealth;
-        GameState.mana = GameState.maxMana;
+        // Corps
+        const body = document.createElement('a-sphere');
+        body.setAttribute('radius', '0.3');
+        body.setAttribute('color', '#ffffff');
+        creature.appendChild(body);
         
-        showLevelUp();
-    }
-    
-    updateHUD();
-}
-
-function showLevelUp() {
-    const text = document.createElement('div');
-    text.className = 'level-up-text';
-    text.textContent = `⬆ NIVEAU ${GameState.level} !`;
-    document.body.appendChild(text);
-    setTimeout(() => text.remove(), 2000);
-}
-
-// ============================================
-// DÉGÂTS AU JOUEUR
-// ============================================
-function damagePlayer(amount) {
-    if (!GameState.running) return;
-    
-    GameState.health -= amount;
-    updateHUD();
-    
-    // Effet visuel
-    const overlay = document.getElementById('damage-overlay');
-    overlay.classList.add('active');
-    setTimeout(() => overlay.classList.remove('active'), 100);
-    
-    if (GameState.health <= 0) {
-        gameOver();
+        // Tête
+        const head = document.createElement('a-sphere');
+        head.setAttribute('radius', '0.18');
+        head.setAttribute('color', '#ffffff');
+        head.setAttribute('position', '0 0.15 -0.35');
+        creature.appendChild(head);
+        
+        creature.wanderAngle = Math.random() * Math.PI * 2;
+        creature.speed = 0.005 + Math.random() * 0.01;
+        
+        creatureZone.appendChild(creature);
+        Game.creatures.push(creature);
     }
 }
 
 // ============================================
-// RÉGÉNÉRATION DE MANA
+// PNJ (personnages non-jouables)
 // ============================================
-function regenerateMana() {
-    if (!GameState.running) return;
-    GameState.mana = Math.min(GameState.maxMana, GameState.mana + 3);
-    updateHUD();
+function spawnNPCs() {
+    const npcZone = document.getElementById('npcs');
+    
+    const npcData = [
+        { name: 'Villageois', emoji: '👨‍🌾', pos: { x: -3, z: -5 }, color: '#8b6914' },
+        { name: 'Marchand', emoji: '🧑‍💼', pos: { x: 12, z: -8 }, color: '#9c6b3c' },
+        { name: 'Enfant', emoji: '👦', pos: { x: 5, z: 3 }, color: '#daa520' },
+        { name: 'Gardien', emoji: '💂', pos: { x: -12, z: -15 }, color: '#6b6b6b' },
+        { name: 'Fermière', emoji: '👩‍🌾', pos: { x: 15, z: 12 }, color: '#c19a6b' }
+    ];
+    
+    npcData.forEach(npc => {
+        const npcEl = document.createElement('a-entity');
+        npcEl.setAttribute('position', `${npc.pos.x} 0 ${npc.pos.z}`);
+        npcEl.setAttribute('npc-behavior', '');
+        
+        // Corps
+        const body = document.createElement('a-cylinder');
+        body.setAttribute('radius', '0.3');
+        body.setAttribute('height', '1.2');
+        body.setAttribute('color', npc.color);
+        body.setAttribute('position', '0 0.6 0');
+        npcEl.appendChild(body);
+        
+        // Tête
+        const head = document.createElement('a-sphere');
+        head.setAttribute('radius', '0.25');
+        head.setAttribute('color', '#ffdbb0');
+        head.setAttribute('position', '0 1.5 0');
+        npcEl.appendChild(head);
+        
+        // Nom flottant
+        const nameText = document.createElement('a-text');
+        nameText.setAttribute('value', npc.emoji + ' ' + npc.name);
+        nameText.setAttribute('position', '0 2.2 0');
+        nameText.setAttribute('align', 'center');
+        nameText.setAttribute('color', '#ffd700');
+        nameText.setAttribute('width', '3');
+        nameText.setAttribute('side', 'double');
+        npcEl.appendChild(nameText);
+        
+        npcZone.appendChild(npcEl);
+    });
 }
 
 // ============================================
-// MISE À JOUR DU HUD
+// COMPOSANT : COMPORTEMENT DES CRÉATURES
 // ============================================
-function updateHUD() {
-    document.getElementById('health').textContent = Math.max(0, Math.floor(GameState.health));
-    document.getElementById('mana').textContent = Math.floor(GameState.mana);
-    document.getElementById('level').textContent = GameState.level;
-    document.getElementById('xp').textContent = Math.floor(GameState.xp);
-    document.getElementById('xpMax').textContent = GameState.xpMax;
-    document.getElementById('enemiesLeft').textContent = 
-        GameState.enemies.length + GameState.enemiesRemaining;
-    document.getElementById('wave').textContent = GameState.wave;
-}
-
-// ============================================
-// GAME OVER
-// ============================================
-function gameOver() {
-    GameState.running = false;
-    clearInterval(GameState.spawnInterval);
-    clearInterval(GameState.manaRegenInterval);
-    
-    // Nettoyer
-    GameState.enemies.forEach(e => e.parentNode && e.parentNode.removeChild(e));
-    GameState.projectiles.forEach(p => p.element.parentNode && p.element.parentNode.removeChild(p.element));
-    GameState.enemies = [];
-    GameState.projectiles = [];
-    
-    const screen = document.getElementById('start-screen');
-    screen.innerHTML = `
-        <div class="start-content">
-            <h1 style="color:#ff4444; text-shadow: 0 0 30px #ff4444;">💀 GAME OVER</h1>
-            <h2>Rudeus est tombé au combat...</h2>
-            <p class="intro">
-                Niveau atteint : <strong style="color:#ffd700;">${GameState.level}</strong><br>
-                Vagues survécues : <strong style="color:#88ddff;">${GameState.wave}</strong><br>
-                Monstres éliminés : <strong style="color:#ff8844;">${GameState.kills}</strong>
-            </p>
-            <button onclick="location.reload()">🔄 RENAÎTRE</button>
-        </div>
-    `;
-    screen.style.display = 'flex';
-    document.getElementById('hud').style.display = 'none';
-    document.getElementById('crosshair').style.display = 'none';
-}
-
-// ============================================
-// COMPOSANT IA ENNEMI (A-Frame)
-// ============================================
-AFRAME.registerComponent('enemy-ai', {
-    init: function() {
-        this.bobPhase = Math.random() * Math.PI * 2;
-        this.lastAttack = 0;
-    },
-    
+AFRAME.registerComponent('creature-behavior', {
     tick: function(time, delta) {
-        if (!GameState.running) return;
+        if (!Game.running || Game.paused) return;
         
-        const enemy = this.el;
-        const enemyPos = enemy.object3D.position;
-        const player = document.getElementById('player');
-        const playerPos = player.object3D.position;
+        const creature = this.el;
+        const pos = creature.object3D.position;
         
-        const dx = playerPos.x - enemyPos.x;
-        const dz = playerPos.z - enemyPos.z;
-        const dist = Math.sqrt(dx * dx + dz * dz);
+        // Dérive aléatoire
+        if (!creature.wanderAngle) creature.wanderAngle = Math.random() * Math.PI * 2;
+        creature.wanderAngle += (Math.random() - 0.5) * 0.05;
         
-        // Se déplacer vers le joueur
-        if (dist > 1.5) {
-            const speed = enemy.speed || 0.02;
-            const moveFactor = speed * (delta / 16);
-            enemyPos.x += (dx / dist) * moveFactor;
-            enemyPos.z += (dz / dist) * moveFactor;
-            
-            // Bob vertical (sautillement)
-            this.bobPhase += 0.15;
-            enemyPos.y = Math.abs(Math.sin(this.bobPhase)) * 0.15;
-        } else {
-            // Attaque
-            if (Date.now() - this.lastAttack > 1200) {
-                this.lastAttack = Date.now();
-                damagePlayer(enemy.damage || 10);
-                
-                // Effet d'attaque
-                enemy.setAttribute('scale', '1.3 1.3 1.3');
-                setTimeout(() => enemy.setAttribute('scale', '1 1 1'), 150);
-            }
-        }
+        const speed = creature.speed || 0.01;
+        pos.x += Math.cos(creature.wanderAngle) * speed * (delta / 16);
+        pos.z += Math.sin(creature.wanderAngle) * speed * (delta / 16);
         
-        // Regarder vers le joueur
-        const angle = Math.atan2(dx, dz);
-        enemy.object3D.rotation.y = angle;
+        // Rebondir dans les limites
+        if (Math.abs(pos.x) > 100) creature.wanderAngle = Math.PI - creature.wanderAngle;
+        if (Math.abs(pos.z) > 100) creature.wanderAngle = -creature.wanderAngle;
         
-        // Faire flotter la barre de vie vers la caméra
-        const healthBarBg = enemy.querySelector('.health-bar-bg');
-        if (healthBarBg) {
-            const camera = document.querySelector('[camera]');
-            const camPos = camera.object3D.position;
-            const barAngle = Math.atan2(camPos.x - enemyPos.x, camPos.z - enemyPos.z);
-            healthBarBg.object3D.rotation.y = barAngle - angle;
-        }
+        // Orientation
+        creature.object3D.rotation.y = -creature.wanderAngle + Math.PI / 2;
+    }
+});
+
+// ============================================
+// COMPOSANT : COMPORTEMENT DES PNJ
+// ============================================
+AFRAME.registerComponent('npc-behavior', {
+    init: function() {
+        this.originalY = this.el.object3D.position.y;
+        this.phase = Math.random() * Math.PI * 2;
+    },
+    tick: function(time, delta) {
+        if (!Game.running) return;
+        
+        // Léger balancement
+        this.phase += 0.03;
+        this.el.object3D.position.y = this.originalY + Math.sin(this.phase) * 0.05;
     }
 });
 
 // ============================================
 // BOUCLE DE JEU
 // ============================================
-let lastTime = performance.now();
-function gameLoop() {
-    const now = performance.now();
-    lastTime = now;
+function gameLoop(now) {
+    if (!Game.running) return;
     
-    if (GameState.running) {
-        updateProjectiles();
+    const delta = Math.min(now - Game.lastFrame, 50);
+    Game.lastFrame = now;
+    
+    if (!Game.paused) {
+        updatePlayer(delta);
+        updateCompass();
+        checkLocationDiscovery();
     }
     
     requestAnimationFrame(gameLoop);
 }
 
-// Démarrage de la boucle
-requestAnimationFrame(gameLoop);
+// ============================================
+// MISE À JOUR DU JOUEUR (mouvement)
+// ============================================
+function updatePlayer(delta) {
+    if (!Game.moveJoystick.active) return;
+    if (Math.abs(Game.moveJoystick.dx) < 0.1 && Math.abs(Game.moveJoystick.dz) < 0.1) return;
+    
+    const char = CHARACTERS[Game.selectedChar];
+    const player = Game.player;
+    const pos = player.object3D.position;
+    
+    // Direction relative à l'orientation de la caméra
+    const yaw = Game.cameraYaw * Math.PI / 180;
+    
+    // dx du joystick = strafe, dz = avant/arrière (dy)
+    const forward = -Game.moveJoystick.dz; // vers le haut = avancer
+    const strafe = Game.moveJoystick.dx;
+    
+    const moveX = Math.sin(yaw) * forward + Math.cos(yaw) * strafe;
+    const moveZ = Math.cos(yaw) * forward - Math.sin(yaw) * strafe;
+    
+    const speed = char.speed * (delta / 16);
+    
+    pos.x += moveX * speed * 2;
+    pos.z += moveZ * speed * 2;
+    
+    // Limiter le monde
+    pos.x = Math.max(-150, Math.min(150, pos.x));
+    pos.z = Math.max(-150, Math.min(150, pos.z));
+}
 
 // ============================================
-// INITIALISATION A-FRAME
+// BOUSSOLE
+// ============================================
+function updateCompass() {
+    const yaw = Game.cameraYaw;
+    const normalized = ((yaw % 360) + 360) % 360;
+    
+    const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
+    const idx = Math.round(normalized / 45) % 8;
+    
+    document.getElementById('compass-needle').textContent = dirs[idx];
+}
+
+// ============================================
+// DÉCOUVERTE DE LIEUX
+// ============================================
+let lastLocation = 'Buina Village';
+
+function checkLocationDiscovery() {
+    if (!Game.player) return;
+    
+    const pos = Game.player.object3D.position;
+    
+    for (const loc of LOCATIONS) {
+        const dist = Math.sqrt(
+            Math.pow(pos.x - loc.x, 2) + Math.pow(pos.z - loc.z, 2)
+        );
+        
+        if (dist < loc.radius && Game.currentLocation !== loc.name) {
+            Game.currentLocation = loc.name;
+            document.getElementById('hud-location').textContent = `📍 ${loc.name}`;
+            if (lastLocation !== loc.name) {
+                notify(`📍 ${loc.name}`, 2000);
+                lastLocation = loc.name;
+            }
+            break;
+        }
+    }
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+function notify(text, duration = 1800) {
+    const el = document.getElementById('notification');
+    el.textContent = text;
+    el.classList.add('show');
+    
+    clearTimeout(el._timeout);
+    el._timeout = setTimeout(() => {
+        el.classList.remove('show');
+    }, duration);
+}
+
+// ============================================
+// MENU PAUSE
+// ============================================
+function showPauseMenu() {
+    Game.paused = true;
+    document.getElementById('pause-menu').style.display = 'flex';
+}
+
+function resumeGame() {
+    Game.paused = false;
+    document.getElementById('pause-menu').style.display = 'none';
+}
+
+function changeCharacter() {
+    location.reload();
+}
+
+function toggleVR() {
+    const scene = document.querySelector('a-scene');
+    if (scene.is('vr-mode')) {
+        scene.exitVR();
+    } else {
+        scene.enterVR();
+    }
+    resumeGame();
+}
+
+// ============================================
+// VR
+// ============================================
+function initVR() {
+    const scene = document.querySelector('a-scene');
+    
+    scene.addEventListener('enter-vr', () => {
+        notify('🥽 Mode VR activé', 2000);
+        document.getElementById('joystick-container').style.display = 'none';
+    });
+    
+    scene.addEventListener('exit-vr', () => {
+        document.getElementById('joystick-container').style.display = 'block';
+    });
+}
+
+// ============================================
+// INIT AU CHARGEMENT
 // ============================================
 window.addEventListener('DOMContentLoaded', () => {
-    console.log('⚔️ Mushoku Tensei VR chargé');
+    console.log('⚔️ Mushoku Tensei - Monde Ouvert chargé');
+    console.log('📱 Version mobile + VR');
 });
