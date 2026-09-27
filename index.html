@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mushoku Tensei VR - Rudeus's Journey</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+</head>
+<body>
+
+<!-- ÉCRAN DE DÉMARRAGE -->
+<div id="start-screen">
+    <div class="start-content">
+        <h1>⚔️ MUSHOKU TENSEI</h1>
+        <h2>~ Rudeus's Journey ~</h2>
+        <p class="intro">Tu es Rudeus Greyrat, réincarné dans un nouveau monde. Maîtrise la magie, affronte les monstres et deviens le plus grand mage de ce monde.</p>
+        <button onclick="startGame()">▶ COMMENCER L'AVENTURE</button>
+        <div class="controls">
+            <p>🖱️ Souris : Regarder | ⌨️ ZQSD : Se déplacer | 🖱️ Clic : Lancer un sort</p>
+            <p>🎯 Touches 1-3 : Changer de sort | 🥽 Compatible VR</p>
+        </div>
+    </div>
+</div>
+
+<!-- HUD -->
+<div id="hud" style="display:none;">
+    <div class="hud-top">
+        <div class="hud-item">❤️ <span id="health">100</span></div>
+        <div class="hud-item">💧 <span id="mana">100</span></div>
+        <div class="hud-item">⭐ Nv. <span id="level">1</span></div>
+        <div class="hud-item">✨ XP <span id="xp">0</span>/<span id="xpMax">100</span></div>
+    </div>
+    <div class="hud-bottom">
+        <div class="spell-slot active" data-spell="0">🔥<br><small>Boule de feu</small></div>
+        <div class="spell-slot" data-spell="1">💧<br><small>Glace</small></div>
+        <div class="spell-slot" data-spell="2">⚡<br><small>Foudre</small></div>
+    </div>
+    <div class="wave-info">🌊 Vague <span id="wave">1</span> | 👹 Restants: <span id="enemiesLeft">0</span></div>
+</div>
+
+<div id="crosshair" style="display:none;">
+    <div class="crosshair-ring"></div>
+    <div class="crosshair-dot"></div>
+</div>
+
+<div id="damage-overlay"></div>
+
+<!-- SCÈNE A-FRAME -->
+<a-scene id="scene"
+    fog="type: exponential; color: #87CEEB; density: 0.015"
+    renderer="antialias: true; colorManagement: true;"
+    vr-mode-ui="enabled: true"
+    background="color: #87CEEB">
+
+    <a-assets>
+        <a-mixin id="tree" 
+                 geometry="primitive: cylinder; radius: 0.4; height: 4" 
+                 material="color: #4a2a1a"></a-mixin>
+    </a-assets>
+
+    <!-- CIEL -->
+    <a-sky color="#87CEEB"></a-sky>
+
+    <!-- SOLEIL -->
+    <a-sphere position="20 30 -30" radius="3" color="#FFFF88" 
+              material="emissive: #FFFF88; emissiveIntensity: 1.5"></a-sphere>
+
+    <!-- LUMIÈRES -->
+    <a-entity light="type: ambient; color: #ffffff; intensity: 0.7"></a-entity>
+    <a-entity light="type: directional; color: #fff5d0; intensity: 0.8; position: 10 20 5"></a-entity>
+
+    <!-- SOL -->
+    <a-plane position="0 0 0" rotation="-90 0 0" width="200" height="200" 
+             color="#4a7c3a" material="shininess: 0;"></a-plane>
+
+    <!-- CHEMIN -->
+    <a-plane position="0 0.01 0" rotation="-90 0 0" width="6" height="100" 
+             color="#8b7355"></a-plane>
+
+    <!-- ARBRES AUTOUR -->
+    <a-entity position="-8 2 -10">
+        <a-cylinder position="0 2 0" radius="0.4" height="4" color="#4a2a1a"></a-cylinder>
+        <a-sphere position="0 5 0" radius="2.5" color="#2d5a1e"></a-sphere>
+    </a-entity>
+    <a-entity position="8 2 -15">
+        <a-cylinder position="0 2 0" radius="0.4" height="4" color="#4a2a1a"></a-cylinder>
+        <a-sphere position="0 5 0" radius="2.5" color="#2d5a1e"></a-sphere>
+    </a-entity>
+    <a-entity position="-12 2 -20">
+        <a-cylinder position="0 2 0" radius="0.4" height="4" color="#4a2a1a"></a-cylinder>
+        <a-sphere position="0 5 0" radius="2.5" color="#2d5a1e"></a-sphere>
+    </a-entity>
+    <a-entity position="12 2 -25">
+        <a-cylinder position="0 2 0" radius="0.4" height="4" color="#4a2a1a"></a-cylinder>
+        <a-sphere position="0 5 0" radius="2.5" color="#2d5a1e"></a-sphere>
+    </a-entity>
+    <a-entity position="-15 2 5">
+        <a-cylinder position="0 2 0" radius="0.4" height="4" color="#4a2a1a"></a-cylinder>
+        <a-sphere position="0 5 0" radius="2.5" color="#2d5a1e"></a-sphere>
+    </a-entity>
+    <a-entity position="15 2 0">
+        <a-cylinder position="0 2 0" radius="0.4" height="4" color="#4a2a1a"></a-cylinder>
+        <a-sphere position="0 5 0" radius="2.5" color="#2d5a1e"></a-sphere>
+    </a-entity>
+
+    <!-- MAISON DE RUDEUS (Boutique magique) -->
+    <a-entity id="home" position="0 0 -20">
+        <a-box position="0 2 0" width="8" height="4" depth="8" color="#c9a06a"></a-box>
+        <a-cone position="0 5.5 0" radius="7" height="4" color="#8B0000" 
+                segments="4" rotation="0 45 0"></a-cone>
+        <a-plane position="0 1.5 4.05" width="1.5" height="2.5" color="#4a2a1a"></a-plane>
+        <a-circle position="2 2.5 4.05" radius="0.7" color="#88ccff"
+                  material="emissive: #88ccff; emissiveIntensity: 0.4"></a-circle>
+        <a-circle position="-2 2.5 4.05" radius="0.7" color="#88ccff"
+                  material="emissive: #88ccff; emissiveIntensity: 0.4"></a-circle>
+        <a-text value="MAGIC GUILD" position="0 4 4.1" color="#ffdd00" 
+                align="center" width="6" font="mozillavr"></a-text>
+    </a-entity>
+
+    <!-- JOUEUR -->
+    <a-entity id="player" position="0 1.6 5">
+        <a-entity id="camera-rig" camera look-controls="pointerLockEnabled: false" 
+                  wasd-controls="acceleration: 60" position="0 0 0">
+            <!-- MAIN DROITE (pour les sorts) -->
+            <a-entity id="right-hand" position="0.4 -0.4 -0.6">
+                <a-sphere radius="0.1" color="#ffdbb0"></a-sphere>
+                <a-entity id="spell-orb" position="0 0 -0.3"
+                          geometry="primitive: sphere; radius: 0.15"
+                          material="color: #ff4400; emissive: #ff4400; emissiveIntensity: 1.5; opacity: 0.8"
+                          visible="true"></a-entity>
+            </a-entity>
+        </a-entity>
+    </a-entity>
+
+    <!-- BÂTON MAGIQUE visible en VR -->
+    <a-entity id="staff" position="0.4 -0.5 -0.9" 
+              geometry="primitive: cylinder; radius: 0.03; height: 1.2"
+              material="color: #5a3a1a"
+              rotation="15 0 0">
+        <a-sphere position="0 0.7 0" radius="0.1" color="#4488ff"
+                  material="emissive: #4488ff; emissiveIntensity: 1"></a-sphere>
+    </a-entity>
+
+</a-scene>
+
+<script src="game.js"></script>
+</body>
+      </html>
