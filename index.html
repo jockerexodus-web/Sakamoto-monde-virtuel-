@@ -2,148 +2,347 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mushoku Tensei VR - Rudeus's Journey</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Mushoku Tensei - Monde Ouvert</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v7.0.0/dist/aframe-extras.min.js"></script>
+    <!-- Contrôles mobiles -->
+    <script src="https://cdn.jsdelivr.net/gh/aframevr/aframe@1.5.0/examples/js/aframe-mobile-controls.js"></script>
 </head>
 <body>
 
-<!-- ÉCRAN DE DÉMARRAGE -->
-<div id="start-screen">
-    <div class="start-content">
+<!-- ===== ÉCRAN DE SÉLECTION DU PERSONNAGE ===== -->
+<div id="char-select">
+    <div class="select-header">
         <h1>⚔️ MUSHOKU TENSEI</h1>
-        <h2>~ Rudeus's Journey ~</h2>
-        <p class="intro">Tu es Rudeus Greyrat, réincarné dans un nouveau monde. Maîtrise la magie, affronte les monstres et deviens le plus grand mage de ce monde.</p>
-        <button onclick="startGame()">▶ COMMENCER L'AVENTURE</button>
-        <div class="controls">
-            <p>🖱️ Souris : Regarder | ⌨️ ZQSD : Se déplacer | 🖱️ Clic : Lancer un sort</p>
-            <p>🎯 Touches 1-3 : Changer de sort | 🥽 Compatible VR</p>
+        <p>Choisis ton personnage et explore le monde</p>
+    </div>
+    
+    <div class="char-grid">
+        <div class="char-card" data-char="rudeus">
+            <div class="char-avatar" style="background: linear-gradient(135deg, #87ceeb, #4682b4);">
+                <span>🧙‍♂️</span>
+            </div>
+            <h3>Rudeus</h3>
+            <p>Mage puissant</p>
+            <small>🔥💧⚡</small>
+        </div>
+        
+        <div class="char-card" data-char="roxy">
+            <div class="char-avatar" style="background: linear-gradient(135deg, #87ceeb, #ffffff);">
+                <span>👩‍🎓</span>
+            </div>
+            <h3>Roxy</h3>
+            <p>Magicienne migurd</p>
+            <small>💧✨</small>
+        </div>
+        
+        <div class="char-card" data-char="eris">
+            <div class="char-avatar" style="background: linear-gradient(135deg, #dc143c, #8b0000);">
+                <span>⚔️</span>
+            </div>
+            <h3>Eris</h3>
+            <p>Guerrière Boréas</p>
+            <small>🗡️🔥</small>
+        </div>
+        
+        <div class="char-card" data-char="sylphie">
+            <div class="char-avatar" style="background: linear-gradient(135deg, #90ee90, #228b22);">
+                <span>🌿</span>
+            </div>
+            <h3>Sylphie</h3>
+            <p>Elfe magicienne</p>
+            <small>🍃💨</small>
+        </div>
+        
+        <div class="char-card" data-char="ruijerd">
+            <div class="char-avatar" style="background: linear-gradient(135deg, #d3d3d3, #696969);">
+                <span>🛡️</span>
+            </div>
+            <h3>Ruijerd</h3>
+            <p>Guerrier Superd</p>
+            <small>⚔️💪</small>
+        </div>
+        
+        <div class="char-card" data-char="paul">
+            <div class="char-avatar" style="background: linear-gradient(135deg, #daa520, #8b4513);">
+                <span>🗡️</span>
+            </div>
+            <h3>Paul</h3>
+            <p>Chevalier épéiste</p>
+            <small>⚔️🛡️</small>
         </div>
     </div>
+    
+    <button id="start-btn" disabled>EXPLORER LE MONDE</button>
+    
+    <div class="hint">📱 Mobile : joystick virtuel + toucher pour regarder</div>
 </div>
 
-<!-- HUD -->
+<!-- ===== HUD EN JEU ===== -->
 <div id="hud" style="display:none;">
     <div class="hud-top">
-        <div class="hud-item">❤️ <span id="health">100</span></div>
-        <div class="hud-item">💧 <span id="mana">100</span></div>
-        <div class="hud-item">⭐ Nv. <span id="level">1</span></div>
-        <div class="hud-item">✨ XP <span id="xp">0</span>/<span id="xpMax">100</span></div>
+        <div class="player-info">
+            <div class="player-avatar" id="hud-avatar">🧙‍♂️</div>
+            <div>
+                <div class="player-name" id="hud-name">Rudeus</div>
+                <div class="player-loc" id="hud-location">📍 Buina Village</div>
+            </div>
+        </div>
+        <button id="menu-btn">☰</button>
     </div>
+    
+    <div class="hud-compass">
+        <div class="compass-ring">
+            <div class="compass-needle" id="compass-needle">N</div>
+        </div>
+    </div>
+    
     <div class="hud-bottom">
-        <div class="spell-slot active" data-spell="0">🔥<br><small>Boule de feu</small></div>
-        <div class="spell-slot" data-spell="1">💧<br><small>Glace</small></div>
-        <div class="spell-slot" data-spell="2">⚡<br><small>Foudre</small></div>
+        <button class="action-btn" id="action-btn">✨</button>
     </div>
-    <div class="wave-info">🌊 Vague <span id="wave">1</span> | 👹 Restants: <span id="enemiesLeft">0</span></div>
 </div>
 
-<div id="crosshair" style="display:none;">
-    <div class="crosshair-ring"></div>
-    <div class="crosshair-dot"></div>
+<!-- ===== JOYSTICK VIRTUEL ===== -->
+<div id="joystick-container" style="display:none;">
+    <div id="joystick-base">
+        <div id="joystick-stick"></div>
+    </div>
 </div>
 
-<div id="damage-overlay"></div>
+<!-- ===== MESSAGES / NOTIFICATIONS ===== -->
+<div id="notification"></div>
 
-<!-- SCÈNE A-FRAME -->
-<a-scene id="scene"
-    fog="type: exponential; color: #87CEEB; density: 0.015"
-    renderer="antialias: true; colorManagement: true;"
-    vr-mode-ui="enabled: true"
-    background="color: #87CEEB">
+<!-- ===== MENU PAUSE ===== -->
+<div id="pause-menu" style="display:none;">
+    <h2>⏸️ Pause</h2>
+    <button onclick="resumeGame()">▶ Reprendre</button>
+    <button onclick="changeCharacter()">🔄 Changer de personnage</button>
+    <button onclick="toggleVR()">🥽 Mode VR</button>
+</div>
+
+<!-- ===== SCÈNE A-FRAME ===== -->
+<a-scene 
+    id="scene"
+    fog="type: exponential; color: #b8d4e8; density: 0.008"
+    renderer="antialias: true; colorManagement: true; logarithmicDepthBuffer: true;"
+    background="color: #87CEEB"
+    device-orientation-permission-ui="enabled: true"
+    vr-mode-ui="enabled: true">
 
     <a-assets>
-        <a-mixin id="tree" 
-                 geometry="primitive: cylinder; radius: 0.4; height: 4" 
-                 material="color: #4a2a1a"></a-mixin>
+        <!-- Ciel -->
+        <img id="sky-img" src="https://cdn.aframe.io/360-image-gallery-boilerplate/img/sechelt.jpg">
     </a-assets>
 
     <!-- CIEL -->
     <a-sky color="#87CEEB"></a-sky>
 
     <!-- SOLEIL -->
-    <a-sphere position="20 30 -30" radius="3" color="#FFFF88" 
-              material="emissive: #FFFF88; emissiveIntensity: 1.5"></a-sphere>
+    <a-entity id="sun" position="50 60 -80">
+        <a-sphere radius="8" color="#FFFFAA" 
+                  material="emissive: #FFFFAA; emissiveIntensity: 2"></a-sphere>
+    </a-entity>
 
     <!-- LUMIÈRES -->
-    <a-entity light="type: ambient; color: #ffffff; intensity: 0.7"></a-entity>
-    <a-entity light="type: directional; color: #fff5d0; intensity: 0.8; position: 10 20 5"></a-entity>
+    <a-entity light="type: ambient; color: #ffffff; intensity: 0.75"></a-entity>
+    <a-entity light="type: directional; color: #fff8d0; intensity: 0.9; position: 20 40 10"></a-entity>
 
-    <!-- SOL -->
-    <a-plane position="0 0 0" rotation="-90 0 0" width="200" height="200" 
-             color="#4a7c3a" material="shininess: 0;"></a-plane>
+    <!-- TERRAIN PRINCIPAL (grande plaine) -->
+    <a-plane position="0 0 0" rotation="-90 0 0" width="500" height="500" 
+             color="#5a8f3a" material="shininess: 0; repeat: 50 50;"></a-plane>
 
-    <!-- CHEMIN -->
-    <a-plane position="0 0.01 0" rotation="-90 0 0" width="6" height="100" 
-             color="#8b7355"></a-plane>
-
-    <!-- ARBRES AUTOUR -->
-    <a-entity position="-8 2 -10">
-        <a-cylinder position="0 2 0" radius="0.4" height="4" color="#4a2a1a"></a-cylinder>
-        <a-sphere position="0 5 0" radius="2.5" color="#2d5a1e"></a-sphere>
+    <!-- MONTAGNES (bord de la carte) -->
+    <a-entity position="0 0 -200">
+        <a-cone position="-60 30 0" radius="40" height="60" color="#4a5a6a"></a-cone>
+        <a-cone position="0 40 0" radius="50" height="80" color="#5a6a7a"></a-cone>
+        <a-cone position="60 35 0" radius="45" height="70" color="#4a5a6a"></a-cone>
     </a-entity>
-    <a-entity position="8 2 -15">
-        <a-cylinder position="0 2 0" radius="0.4" height="4" color="#4a2a1a"></a-cylinder>
-        <a-sphere position="0 5 0" radius="2.5" color="#2d5a1e"></a-sphere>
-    </a-entity>
-    <a-entity position="-12 2 -20">
-        <a-cylinder position="0 2 0" radius="0.4" height="4" color="#4a2a1a"></a-cylinder>
-        <a-sphere position="0 5 0" radius="2.5" color="#2d5a1e"></a-sphere>
-    </a-entity>
-    <a-entity position="12 2 -25">
-        <a-cylinder position="0 2 0" radius="0.4" height="4" color="#4a2a1a"></a-cylinder>
-        <a-sphere position="0 5 0" radius="2.5" color="#2d5a1e"></a-sphere>
-    </a-entity>
-    <a-entity position="-15 2 5">
-        <a-cylinder position="0 2 0" radius="0.4" height="4" color="#4a2a1a"></a-cylinder>
-        <a-sphere position="0 5 0" radius="2.5" color="#2d5a1e"></a-sphere>
-    </a-entity>
-    <a-entity position="15 2 0">
-        <a-cylinder position="0 2 0" radius="0.4" height="4" color="#4a2a1a"></a-cylinder>
-        <a-sphere position="0 5 0" radius="2.5" color="#2d5a1e"></a-sphere>
+    <a-entity position="0 0 200">
+        <a-cone position="-60 30 0" radius="40" height="60" color="#4a5a6a"></a-cone>
+        <a-cone position="0 40 0" radius="50" height="80" color="#5a6a7a"></a-cone>
+        <a-cone position="60 35 0" radius="45" height="70" color="#4a5a6a"></a-cone>
     </a-entity>
 
-    <!-- MAISON DE RUDEUS (Boutique magique) -->
-    <a-entity id="home" position="0 0 -20">
-        <a-box position="0 2 0" width="8" height="4" depth="8" color="#c9a06a"></a-box>
-        <a-cone position="0 5.5 0" radius="7" height="4" color="#8B0000" 
-                segments="4" rotation="0 45 0"></a-cone>
-        <a-plane position="0 1.5 4.05" width="1.5" height="2.5" color="#4a2a1a"></a-plane>
-        <a-circle position="2 2.5 4.05" radius="0.7" color="#88ccff"
-                  material="emissive: #88ccff; emissiveIntensity: 0.4"></a-circle>
-        <a-circle position="-2 2.5 4.05" radius="0.7" color="#88ccff"
-                  material="emissive: #88ccff; emissiveIntensity: 0.4"></a-circle>
-        <a-text value="MAGIC GUILD" position="0 4 4.1" color="#ffdd00" 
-                align="center" width="6" font="mozillavr"></a-text>
-    </a-entity>
-
-    <!-- JOUEUR -->
-    <a-entity id="player" position="0 1.6 5">
-        <a-entity id="camera-rig" camera look-controls="pointerLockEnabled: false" 
-                  wasd-controls="acceleration: 60" position="0 0 0">
-            <!-- MAIN DROITE (pour les sorts) -->
-            <a-entity id="right-hand" position="0.4 -0.4 -0.6">
-                <a-sphere radius="0.1" color="#ffdbb0"></a-sphere>
-                <a-entity id="spell-orb" position="0 0 -0.3"
-                          geometry="primitive: sphere; radius: 0.15"
-                          material="color: #ff4400; emissive: #ff4400; emissiveIntensity: 1.5; opacity: 0.8"
-                          visible="true"></a-entity>
-            </a-entity>
+    <!-- ===== VILLAGE DE BUINA ===== -->
+    <a-entity id="buina-village" position="0 0 0">
+        
+        <!-- Maison de Rudeus -->
+        <a-entity position="0 0 -15">
+            <a-box position="0 2 0" width="6" height="4" depth="5" color="#c9a06a"></a-box>
+            <a-cone position="0 5 0" radius="5" height="3" color="#8B4513" segments="4" rotation="0 45 0"></a-cone>
+            <a-box position="0 1 2.6" width="1.2" height="2" depth="0.1" color="#4a2a1a"></a-box>
+            <a-box position="2 2.5 2.55" width="0.8" height="0.8" depth="0.05" color="#88ccff" 
+                   material="emissive: #88ccff; emissiveIntensity: 0.3"></a-box>
+            <a-text value="🏠 Maison Greyrat" position="0 5.5 0" color="#ffffff" 
+                    align="center" width="5" side="double"></a-text>
+        </a-entity>
+        
+        <!-- Taverne -->
+        <a-entity position="-15 0 -10">
+            <a-box position="0 2 0" width="8" height="4" depth="6" color="#a0704a"></a-box>
+            <a-cone position="0 5 0" radius="6" height="3.5" color="#5a3a1a" segments="4" rotation="0 45 0"></a-cone>
+            <a-box position="0 1 3.1" width="1.5" height="2" depth="0.1" color="#3a1a0a"></a-box>
+            <a-text value="🍺 Taverne" position="0 5.5 0" color="#ffdd00" 
+                    align="center" width="5" side="double"></a-text>
+            <a-entity light="type: point; color: #ffaa44; intensity: 0.6; distance: 15" 
+                      position="0 3 0"></a-entity>
+        </a-entity>
+        
+        <!-- Forge -->
+        <a-entity position="15 0 -12">
+            <a-box position="0 2 0" width="7" height="4" depth="6" color="#6a5a4a"></a-box>
+            <a-cone position="0 5 0" radius="5.5" height="3" color="#3a2a1a" segments="4" rotation="0 45 0"></a-cone>
+            <a-text value="⚒️ Forge" position="0 5.5 0" color="#ff8844" 
+                    align="center" width="5" side="double"></a-text>
+            <a-entity light="type: point; color: #ff4400; intensity: 0.5; distance: 12" 
+                      position="0 2 0"></a-entity>
+        </a-entity>
+        
+        <!-- Fontaine centrale -->
+        <a-entity position="0 0 0">
+            <a-cylinder position="0 0.3 0" radius="3" height="0.6" color="#888888"></a-cylinder>
+            <a-cylinder position="0 0.5 0" radius="2.7" height="0.2" color="#4488dd" 
+                       material="emissive: #4488dd; emissiveIntensity: 0.3"></a-cylinder>
+            <a-cylinder position="0 1.5 0" radius="0.4" height="2" color="#777777"></a-cylinder>
+            <a-sphere position="0 2.8 0" radius="0.5" color="#4488dd" 
+                     material="emissive: #4488dd; emissiveIntensity: 0.6"></a-sphere>
+        </a-entity>
+        
+        <!-- Arbres décoratifs -->
+        <a-entity position="-8 0 5">
+            <a-cylinder position="0 1.5 0" radius="0.3" height="3" color="#5a3a1a"></a-cylinder>
+            <a-sphere position="0 3.5 0" radius="1.5" color="#2d5a1e"></a-sphere>
+        </a-entity>
+        <a-entity position="8 0 6">
+            <a-cylinder position="0 1.5 0" radius="0.3" height="3" color="#5a3a1a"></a-cylinder>
+            <a-sphere position="0 3.5 0" radius="1.5" color="#2d5a1e"></a-sphere>
+        </a-entity>
+        <a-entity position="-10 0 -20">
+            <a-cylinder position="0 1.5 0" radius="0.3" height="3" color="#5a3a1a"></a-cylinder>
+            <a-sphere position="0 3.5 0" radius="1.5" color="#2d5a1e"></a-sphere>
         </a-entity>
     </a-entity>
 
-    <!-- BÂTON MAGIQUE visible en VR -->
-    <a-entity id="staff" position="0.4 -0.5 -0.9" 
-              geometry="primitive: cylinder; radius: 0.03; height: 1.2"
-              material="color: #5a3a1a"
-              rotation="15 0 0">
-        <a-sphere position="0 0.7 0" radius="0.1" color="#4488ff"
-                  material="emissive: #4488ff; emissiveIntensity: 1"></a-sphere>
+    <!-- ===== LIEU : FORÊT (Nord) ===== -->
+    <a-entity id="forest-zone" position="0 0 -80">
+        <!-- Zone de forêt dense -->
+        <a-circle position="0 0.02 0" rotation="-90 0 0" radius="35" 
+                  color="#1e4a1e" opacity="0.6"></a-circle>
+        
+        <!-- Beaucoup d'arbres -->
+        <a-entity position="-15 0 -10">
+            <a-cylinder position="0 3 0" radius="0.5" height="6" color="#3a2a1a"></a-cylinder>
+            <a-sphere position="0 7 0" radius="3" color="#1e4a1e"></a-sphere>
+        </a-entity>
+        <a-entity position="10 0 -15">
+            <a-cylinder position="0 3 0" radius="0.5" height="6" color="#3a2a1a"></a-cylinder>
+            <a-sphere position="0 7 0" radius="3" color="#1e4a1e"></a-sphere>
+        </a-entity>
+        <a-entity position="-20 0 10">
+            <a-cylinder position="0 3 0" radius="0.5" height="6" color="#3a2a1a"></a-cylinder>
+            <a-sphere position="0 7 0" radius="3" color="#1e4a1e"></a-sphere>
+        </a-entity>
+        <a-entity position="18 0 8">
+            <a-cylinder position="0 3 0" radius="0.5" height="6" color="#3a2a1a"></a-cylinder>
+            <a-sphere position="0 7 0" radius="3" color="#1e4a1e"></a-sphere>
+        </a-entity>
+        <a-entity position="0 0 -20">
+            <a-cylinder position="0 3 0" radius="0.5" height="6" color="#3a2a1a"></a-cylinder>
+            <a-sphere position="0 7 0" radius="3" color="#1e4a1e"></a-sphere>
+        </a-entity>
+        
+        <a-text value="🌲 Forêt de Buina" position="0 3 0" color="#ffffff" 
+                align="center" width="10" side="double" rotation="0 0 0"></a-text>
+    </a-entity>
+
+    <!-- ===== LIEU : LAC (Est) ===== -->
+    <a-entity id="lake-zone" position="80 0 0">
+        <a-circle position="0 0.05 0" rotation="-90 0 0" radius="25" 
+                  color="#1e5a9e" material="emissive: #4488cc; emissiveIntensity: 0.2; opacity: 0.9"></a-circle>
+        <a-entity position="0 0 -20">
+            <a-cylinder position="0 2 0" radius="0.4" height="4" color="#3a2a1a"></a-cylinder>
+            <a-sphere position="0 4.5 0" radius="2" color="#2d5a1e"></a-sphere>
+        </a-entity>
+        <a-entity position="20 0 15">
+            <a-cylinder position="0 2 0" radius="0.4" height="4" color="#3a2a1a"></a-cylinder>
+            <a-sphere position="0 4.5 0" radius="2" color="#2d5a1e"></a-sphere>
+        </a-entity>
+        <a-text value="💧 Lac Sacré" position="0 3 0" color="#ffffff" 
+                align="center" width="10" side="double"></a-text>
+    </a-entity>
+
+    <!-- ===== LIEU : RUINES (Ouest) ===== -->
+    <a-entity id="ruins-zone" position="-80 0 0">
+        <a-circle position="0 0.02 0" rotation="-90 0 0" radius="25" 
+                  color="#4a4030" opacity="0.7"></a-circle>
+        
+        <!-- Colonnes brisées -->
+        <a-entity position="-10 0 -8">
+            <a-cylinder position="0 2 0" radius="0.8" height="4" color="#a09080"></a-cylinder>
+            <a-cylinder position="0 3.5 0" radius="0.9" height="0.5" color="#807060"></a-cylinder>
+        </a-entity>
+        <a-entity position="8 0 -12">
+            <a-cylinder position="0 3 0" radius="0.8" height="6" color="#a09080"></a-cylinder>
+        </a-entity>
+        <a-entity position="-5 0 10">
+            <a-cylinder position="0 1.5 0" radius="0.8" height="3" color="#a09080"></a-cylinder>
+        </a-entity>
+        <a-entity position="12 0 5">
+            <a-cylinder position="0 2.5 0" radius="0.8" height="5" color="#a09080"></a-cylinder>
+        </a-entity>
+        
+        <!-- Arche -->
+        <a-entity position="0 4 0">
+            <a-box position="-2 0 0" width="0.8" height="8" depth="0.8" color="#a09080"></a-box>
+            <a-box position="2 0 0" width="0.8" height="8" depth="0.8" color="#a09080"></a-box>
+            <a-box position="0 4 0" width="5" height="0.8" depth="0.8" color="#a09080"></a-box>
+        </a-entity>
+        
+        <a-text value="🏛️ Ruines Antiques" position="0 8 0" color="#ffffff" 
+                align="center" width="10" side="double"></a-text>
+        <a-entity light="type: point; color: #aa88ff; intensity: 0.8; distance: 20" 
+                  position="0 4 0"></a-entity>
+    </a-entity>
+
+    <!-- ===== LIEU : MONTAGNE (Sud) ===== -->
+    <a-entity id="mountain-zone" position="0 0 80">
+        <a-cone position="0 15 0" radius="25" height="30" color="#6a7a8a"></a-cone>
+        <a-cone position="0 20 0" radius="15" height="20" color="#8a9aaa"></a-cone>
+        <a-cone position="0 25 0" radius="8" height="10" color="#ffffff"></a-cone>
+        <a-text value="⛰️ Montagne" position="0 32 0" color="#ffffff" 
+                align="center" width="10" side="double"></a-text>
+    </a-entity>
+
+    <!-- ===== MONSTRES (paisibles, ambiance) ===== -->
+    <a-entity id="creatures"></a-entity>
+
+    <!-- ===== PNJ ===== -->
+    <a-entity id="npcs"></a-entity>
+
+    <!-- ===== JOUEUR ===== -->
+    <a-entity id="player" position="0 1.6 0">
+        <a-entity id="camera-rig" 
+                  camera 
+                  look-controls="touchEnabled: true; magicWindowTrackingEnabled: true; pointerLockEnabled: false"
+                  position="0 0 0">
+            <!-- Main / objet tenu -->
+            <a-entity id="hand" position="0.3 -0.4 -0.5">
+                <a-sphere radius="0.1" color="#ffdbb0"></a-sphere>
+                <a-entity id="held-item" position="0 0 -0.3">
+                    <a-cylinder radius="0.03" height="0.8" color="#5a3a1a" rotation="90 0 0"></a-cylinder>
+                    <a-sphere position="0 0 -0.4" radius="0.08" color="#4488ff"
+                              material="emissive: #4488ff; emissiveIntensity: 1"></a-sphere>
+                </a-entity>
+            </a-entity>
+        </a-entity>
     </a-entity>
 
 </a-scene>
 
 <script src="game.js"></script>
 </body>
-      </html>
+</html>
